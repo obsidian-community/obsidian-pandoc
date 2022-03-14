@@ -11,7 +11,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as YAML from 'yaml';
 
-import { FileSystemAdapter, MarkdownRenderer, MarkdownView, Notice } from 'obsidian';
+import { FileSystemAdapter, MarkdownRenderer, MarkdownView, Notice, resolveSubpath, parseLinktext } from 'obsidian';
 
 import PandocPlugin from './main';
 import { PandocPluginSettings } from './global';
@@ -173,8 +173,10 @@ async function postProcessRenderedHTML(plugin: PandocPlugin, inputFile: string, 
     for (let span of Array.from(wrapper.querySelectorAll('span.internal-embed'))) {
         let src = span.getAttribute('src');
         if (src) {
-            const subfolder = inputFile.substring(adapter.getBasePath().length);  // TODO: this is messy
-            const file = plugin.app.metadataCache.getFirstLinkpathDest(src, subfolder);
+            const link_split = parseLinktext(src);
+            const subfolder = inputFile.substring(adapter.getBasePath().length); // TODO: this is messy
+            const file = plugin.app.metadataCache.getFirstLinkpathDest(link_split.path, subfolder);
+
             try {
                 if (parentFiles.indexOf(file.path) !== -1) {
                     // We've got an infinite recursion on our hands
@@ -182,7 +184,22 @@ async function postProcessRenderedHTML(plugin: PandocPlugin, inputFile: string, 
                     // Then our link processing happens afterwards
                     span.outerHTML = `<a href="${file}">${span.innerHTML}</a>`;
                 } else {
-                    const markdown = await adapter.read(file.path);
+                    let markdown = await adapter.read(file.path);
+
+                    if(link_split.subpath) {
+                        const subpath_result = resolveSubpath(plugin.app.metadataCache.getFileCache(file), link_split.subpath);
+
+                        if(subpath_result.type === "heading") {
+                            // This will grab everything from the end of the selected heading (excluding the heading title!) to the start of the next heading)
+                            let end_pos = subpath_result.next ? subpath_result.next.position.start.offset : markdown.length
+                            markdown = markdown.substring(subpath_result.current.position.end.offset, end_pos);
+                        } else {
+                            // Grab the whole block without excluding titles
+                            markdown = markdown.substring(subpath_result.block.position.start.offset, subpath_result.block.position.end.offset);
+                        }
+
+                    }
+
                     const newParentFiles = [...parentFiles];
                     newParentFiles.push(inputFile);
                     // TODO: because of this cast, embedded notes won't be able to handle complex plugins (eg DataView)
