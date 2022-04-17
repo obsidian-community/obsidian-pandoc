@@ -1,5 +1,6 @@
 
 import * as fs from 'fs';
+import * as path from 'path';
 
 export interface PandocPluginSettings {
     // Show a command like `pandoc -o Output.html -t html -f commonmark Input.md`
@@ -30,6 +31,8 @@ export interface PandocPluginSettings {
     extraArguments: string,
     // Export from HTML or from markdown?
     exportFrom: 'html' | 'md',
+    // If the output file already exists add an integer increment to the filename. eg. MyNote.docx => MyNote1.docx
+    incrementOnFilenameConflict: boolean,
 }
 
 export const DEFAULT_SETTINGS: PandocPluginSettings = {
@@ -46,19 +49,28 @@ export const DEFAULT_SETTINGS: PandocPluginSettings = {
     outputFolder: null,
     extraArguments: '',
     exportFrom: 'html',
+    incrementOnFilenameConflict: false,
 }
 
-export function replaceFileExtension(file: string, ext: string): string {
-    // Source: https://stackoverflow.com/a/5953384/4642943
-    let pos = file.lastIndexOf('.');
-    return file.substr(0, pos < 0 ? file.length : pos) + '.' + ext;
+export function replaceFileExtension(filename: string, ext: string): string {
+    return path.basename(filename, path.extname(filename)) + '.' + ext;
 }
 
 export async function fileExists(path: string): Promise<boolean> {
     try {
-        const stats = await fs.promises.stat(path);
-        return stats && stats.isFile();
-    } catch (e) {
+        await fs.promises.access(path)
+        return true
+    } catch {
         return false;
     }
+}
+
+export async function getUniqueFilename (filename: string, increment: number = 0): Promise<string> {
+    const name = path.join(
+        path.dirname(filename),
+        `${path.basename(filename, path.extname(filename))}${increment || ""}${path.extname(filename)}`);
+    if((await fileExists(name))){
+        return getUniqueFilename(filename, increment + 1);
+    }
+    return name;
 }

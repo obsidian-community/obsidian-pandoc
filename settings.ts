@@ -140,6 +140,16 @@ export default class PandocPluginSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
+            .setName("Increment filename on conflict")
+            .setDesc("When the output file already exists, add a numerical increment to avoid overwriting the existing file")
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.incrementOnFilenameConflict)
+                .onChange(async (value: boolean) => {
+                    this.plugin.settings.incrementOnFilenameConflict = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
             .setName("Extra Pandoc arguments")
             .setDesc("Add extra command line arguments so you can use templates or bibliographies. Newlines are turned into spaces")
             .addTextArea(text => text

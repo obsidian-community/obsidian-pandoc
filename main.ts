@@ -18,7 +18,13 @@ import * as temp from 'temp';
 
 import render from './renderer';
 import PandocPluginSettingTab from './settings';
-import { PandocPluginSettings, DEFAULT_SETTINGS, replaceFileExtension } from './global';
+import {
+    PandocPluginSettings,
+    DEFAULT_SETTINGS,
+    replaceFileExtension,
+    fileExists,
+    getUniqueFilename
+} from './global';
 export default class PandocPlugin extends Plugin {
     settings: PandocPluginSettings;
     features: { [key: string]: string | undefined } = {};
@@ -94,9 +100,15 @@ export default class PandocPlugin extends Plugin {
         // However, we provide an option to use MD instead to use citations
 
         let outputFile: string = replaceFileExtension(inputFile, extension);
+
         if (this.settings.outputFolder) {
             outputFile = path.join(this.settings.outputFolder, path.basename(outputFile));
         }
+
+        if(this.settings.incrementOnFilenameConflict && (await fileExists(outputFile))) {
+            outputFile = await getUniqueFilename(outputFile, 1);
+        }
+
         const view = this.app.workspace.getActiveViewOfType(MarkdownView);
         
         try {
