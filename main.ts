@@ -9,13 +9,13 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import * as YAML from 'yaml';
+import * as temp from 'temp';
 
 import { Notice, Plugin, FileSystemAdapter, MarkdownView } from 'obsidian';
 import { lookpath } from 'lookpath';
 import { pandoc, inputExtensions, outputFormats, OutputFormat, needsLaTeX, needsPandoc } from './pandoc';
-import * as YAML from 'yaml';
-import * as temp from 'temp';
-
+import { ConfirmModal } from "./confirm-modal";
 import render from './renderer';
 import PandocPluginSettingTab from './settings';
 import {
@@ -25,6 +25,7 @@ import {
     fileExists,
     getUniqueFilename
 } from './global';
+
 export default class PandocPlugin extends Plugin {
     settings: PandocPluginSettings;
     features: { [key: string]: string | undefined } = {};
@@ -91,13 +92,8 @@ export default class PandocPlugin extends Plugin {
         this.features['pdflatex'] = this.settings.pdflatex || await lookpath('pdflatex');
     }
 
+    // noinspection FallThroughInSwitchStatementJS
     async startPandocExport(inputFile: string, format: OutputFormat, extension: string, shortName: string) {
-        new Notice(`Exporting ${inputFile} to ${shortName}`);
-
-        // Instead of using Pandoc to process the raw Markdown, we use Obsidian's
-        // internal markdown renderer, and process the HTML it generates instead.
-        // This allows us to more easily deal with Obsidian specific Markdown syntax.
-        // However, we provide an option to use MD instead to use citations
 
         let outputFile: string = replaceFileExtension(inputFile, extension);
 
@@ -105,18 +101,42 @@ export default class PandocPlugin extends Plugin {
             outputFile = path.join(this.settings.outputFolder, path.basename(outputFile));
         }
 
-        if(this.settings.incrementOnFilenameConflict && (await fileExists(outputFile))) {
-            outputFile = await getUniqueFilename(outputFile, 1);
+        switch(this.settings.overwriteMode){
+            case 'increment':
+                outputFile = await getUniqueFilename(outputFile);
+                //fall through
+            case 'overwrite':
+                await this.doPandocExport(inputFile, format, outputFile, shortName);
+                break;
+            case 'confirm':
+                if(await fileExists(outputFile)) {
+                    new ConfirmModal(this.app, outputFile, (doOverwrite) => {
+                        if(doOverwrite) {
+                            this.doPandocExport(inputFile, format, outputFile, shortName);
+                        } //else do nothing
+                    }).open();
+                } else { //file doesn't exist yet
+                    await this.doPandocExport(inputFile, format, outputFile, shortName);
+                }
         }
+    }
+
+    private async doPandocExport(inputFile: string, format: OutputFormat, outputFile: string, shortName: string) {
+        new Notice(`Exporting ${inputFile} to ${shortName}`);
+
+        // Instead of using Pandoc to process the raw Markdown, we use Obsidian's
+        // internal markdown renderer, and process the HTML it generates instead.
+        // This allows us to more easily deal with Obsidian specific Markdown syntax.
+        // However, we provide an option to use MD instead to use citations
 
         const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-        
+
         try {
             let error, command;
 
             switch (this.settings.exportFrom) {
                 case 'html': {
-                    const { html, metadata } = await render(this, view, inputFile, format);
+                    const {html, metadata} = await render(this, view, inputFile, format);
 
                     if (format === 'html') {
                         // Write to HTML file
@@ -133,7 +153,7 @@ export default class PandocPlugin extends Plugin {
                                 file: 'STDIN', contents: html, format: 'html', metadataFile,
                                 pandoc: this.settings.pandoc, pdflatex: this.settings.pdflatex
                             },
-                            { file: outputFile, format },
+                            {file: outputFile, format},
                             this.settings.extraArguments.split('\n')
                         );
                         error = result.error;
@@ -147,7 +167,7 @@ export default class PandocPlugin extends Plugin {
                             file: inputFile, format: 'markdown',
                             pandoc: this.settings.pandoc, pdflatex: this.settings.pdflatex
                         },
-                        { file: outputFile, format },
+                        {file: outputFile, format},
                         this.settings.extraArguments.split('\n')
                     );
                     error = result.error;

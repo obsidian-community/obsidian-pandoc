@@ -140,12 +140,17 @@ export default class PandocPluginSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName("Increment filename on conflict")
-            .setDesc("When the output file already exists, add a numerical increment to avoid overwriting the existing file")
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.incrementOnFilenameConflict)
-                .onChange(async (value: boolean) => {
-                    this.plugin.settings.incrementOnFilenameConflict = value;
+            .setName("Overwrite Mode")
+            .setDesc("Controls what happens when the target output file already exists at the destination")
+            .addDropdown(dropdown => dropdown
+                .addOptions({
+                    "overwrite": "Overwrite existing file",
+                    "confirm": "Confirm before overwriting existing file",
+                    "increment": "Add numerical increment to avoid overwrite",
+                })
+                .setValue(this.plugin.settings.overwriteMode)
+                .onChange(async (value: string) => {
+                    this.plugin.settings.overwriteMode = value as 'overwrite' | 'confirm' | 'increment';
                     await this.plugin.saveSettings();
                 }));
 

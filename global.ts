@@ -32,7 +32,7 @@ export interface PandocPluginSettings {
     // Export from HTML or from markdown?
     exportFrom: 'html' | 'md',
     // If the output file already exists add an integer increment to the filename. eg. MyNote.docx => MyNote1.docx
-    incrementOnFilenameConflict: boolean,
+    overwriteMode: 'overwrite' | 'confirm' | 'increment',
 }
 
 export const DEFAULT_SETTINGS: PandocPluginSettings = {
@@ -49,7 +49,7 @@ export const DEFAULT_SETTINGS: PandocPluginSettings = {
     outputFolder: null,
     extraArguments: '',
     exportFrom: 'html',
-    incrementOnFilenameConflict: false,
+    overwriteMode: 'overwrite'
 }
 
 export function replaceFileExtension(filename: string, ext: string): string {
