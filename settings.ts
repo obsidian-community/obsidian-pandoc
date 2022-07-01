@@ -140,6 +140,21 @@ export default class PandocPluginSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
+            .setName("Overwrite Mode")
+            .setDesc("Controls what happens when the target output file already exists at the destination")
+            .addDropdown(dropdown => dropdown
+                .addOptions({
+                    "overwrite": "Overwrite existing file",
+                    "confirm": "Confirm before overwriting existing file",
+                    "increment": "Add numerical increment to avoid overwrite",
+                })
+                .setValue(this.plugin.settings.overwriteMode)
+                .onChange(async (value: string) => {
+                    this.plugin.settings.overwriteMode = value as 'overwrite' | 'confirm' | 'increment';
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
             .setName("Extra Pandoc arguments")
             .setDesc("Add extra command line arguments so you can use templates or bibliographies. Newlines are turned into spaces")
             .addTextArea(text => text
